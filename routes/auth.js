@@ -3,12 +3,16 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const passport = require('passport');
 const User = require('../models/user');
-const jwt = require('jsonwebtoken');
 const generateToken = require('../middleware/generateToken');
 
 router.post('/register',async (req, res)=> {
     try{
         const {username, password, email} = req.body;
+
+        if (!username || !password || !email) {
+            return res.status(400).json({ message: 'All fields are required' });
+        }
+
         const existingUser = await User.findOne({$or :[{username: username}, {email: email}]});
         if (existingUser) {
             return res.status(400).json({ message: 'Username or email already exists' });
@@ -22,7 +26,7 @@ router.post('/register',async (req, res)=> {
         await newUser.save();
         // Generate JWT token
         const token = generateToken(newUser);
-        res.status(201).json({ message: 'User created successfully' });
+        res.status(201).json({ message: 'User created successfully' , token: token});
         
     } catch (error) {
         console.error('Error registering user:', error);
@@ -39,7 +43,7 @@ router.post('/login', passport.authenticate('local', {session:false}),(err, user
     }
     // Generate JWT token
     const token = generateToken(user);
-    res.json({ message: 'Login successful', token:token });
+    res.json({ message: 'Login successful', token:token, user:{id: user_id, username:user.eventNames, email:email} });
     res.status(200).json({ message: 'Login successful', token });
 });
 

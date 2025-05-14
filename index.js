@@ -7,8 +7,12 @@ const cors = require('cors')
 const app = express();
 const PORT = 8000;
 const authRoutes = require('./routes/auth')
+const generateToken = require('./middleware/generateToken')
 
 dotenv.config()
+require('./config/googleAuth')
+
+
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 app.use(cors({
@@ -17,7 +21,7 @@ app.use(cors({
 }))
 
 app.use(session({
-    secret: 'secret',
+    secret: process.env.SESSION_SECRET || 'secret',
     resave: false,
     saveUninitialized: false,
     cookie: { maxAge: 60000 }
@@ -47,7 +51,7 @@ app.get('/auth/google/callback', passport.authenticate('google', {
 }), (req, res) => {
     // Successful authentication, redirect home.
     const token = generateToken(req.user);
-    res.redirect('http://localhost:5173');
+    res.redirect(`http://localhost:5173/auth-success?token=${token}`);
 }
 );
 app.get('/auth/github', passport.authenticate('github', {
@@ -61,9 +65,13 @@ app.get('/auth/github/callback', passport.authenticate('github', {
 }), (req, res) => {
     // Successful authentication, redirect home.
     const token = generateToken(req.user);
-    res.redirect('http://localhost:5173');
+    res.redirect(`http://localhost:5173/auth-success?token=${token}`);
 }
 );
+
+app.get('/api/status', (res, req) => {
+    res.json({status: 'Api is running'})
+} )
 
 app.listen(PORT, () => {
     console.log(`The server is running on port ${PORT}`)
