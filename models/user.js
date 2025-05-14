@@ -6,9 +6,9 @@ const userSchema = new mongoose.Schema({
     password: { type: String, required: true },
     email: { type: String, required: true, unique: true },
 
-    googleId: { type: String, unique: true },
-    githubId: { type: String, unique: true },
-    appleId: { type: String, unique: true },
+    googleId: { type: String, unique: true, sparse: true },
+    githubId: { type: String, unique: true, sparse: true },
+    appleId: { type: String, unique: true, sparse: true },
 
     displayName: { type: String },
     profilePicture: { type: String },

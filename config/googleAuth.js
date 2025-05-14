@@ -27,9 +27,9 @@ passport.use(new localStrategy({
     passwordField: 'password'
 }, async (email, password, done) => {
     try {
-        const user  = await User.findOne({$or :[{username: username}, {email: email}]}). select('+password');
+        const user  = await User.findOne({email: email}). select('+password');
         if (!user) {
-            return done(null, false, { message: 'Incorrect username or password' });
+            return done(null, false, { message: 'Incorrect email or password' });
         }
 
         const PasswordMatch = await bcrypt.compare(password, user.password);
@@ -95,7 +95,7 @@ passport.use(new GithubStrategy({
     }
 }));
 
-passport.use(new AppleStrategy({
+/*passport.use(new AppleStrategy({
     clientID: process.env.APPLE_CLIENT_ID,
     teamID: process.env.APPLE_TEAM_ID,
     keyID: process.env.APPLE_KEY_ID,
@@ -119,6 +119,7 @@ passport.use(new AppleStrategy({
         done(error, null);
     }
 }));
+*/
 
 
 
