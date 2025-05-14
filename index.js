@@ -3,10 +3,10 @@ const dotenv = require('dotenv')
 const mongoose = require('mongoose')
 const session = require('express-session')
 const passport = require('passport')
-const bcrypt = require('bcrypt')
 const cors = require('cors')
 const app = express();
 const PORT = 8000;
+const authRoutes = require('./routes/auth')
 
 dotenv.config()
 app.use(express.json())
@@ -33,11 +33,39 @@ mongoose.connect(process.env.MONGO_URI, {
     console.log('MongoDB connected')
 }).catch(err => {
     console.error('MongoDB connection error:', err)
+});
+
+app.use('/api/auth', authRoutes)
+
+app.get('/auth/google', passport.authenticate('google', {
+    scope: ['profile', 'email']
+}));
+
+app.get('/auth/google/callback', passport.authenticate('google', {
+    failureRedirect: '/login',
+    session: false
+}), (req, res) => {
+    // Successful authentication, redirect home.
+    const token = generateToken(req.user);
+    res.redirect('http://localhost:5173');
 }
+);
+app.get('/auth/github', passport.authenticate('github', {
+    scope: ['profile', 'email']
+}));
 
+app.get('/auth/github/callback', passport.authenticate('github', {
+    failureRedirect: '/login',
 
+    session: false
+}), (req, res) => {
+    // Successful authentication, redirect home.
+    const token = generateToken(req.user);
+    res.redirect('http://localhost:5173');
+}
+);
 
-app.listen(PORT, ()=>{
+app.listen(PORT, () => {
     console.log(`The server is running on port ${PORT}`)
 });
 
