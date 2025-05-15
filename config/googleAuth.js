@@ -76,6 +76,7 @@ passport.use(new GithubStrategy({
     clientID: process.env.GITHUB_CLIENT_ID,
     clientSecret: process.env.GITHUB_CLIENT_SECRET,
     callbackURL: process.env.GITHUB_CALLBACK_URL,
+    scope:['read:user', 'user:email']
 }, async (accessToken, refreshToken, profile, done) => {
     try {
         const existingUser = await User.findOne({ githubId: profile.id });

@@ -17,7 +17,8 @@ app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 app.use(cors({
     origin: 'http://localhost:5173',
-    credentials: true
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
 }))
 
 app.use(session({
@@ -41,7 +42,7 @@ mongoose.connect(process.env.MONGODB_URI, {
 
 app.use('/api/auth', authRoutes)
 
-app.get('/auth/google', passport.authenticate('google', {
+app.get('/api/auth/google', passport.authenticate('google', {
     scope: ['profile', 'email']
 }));
 
@@ -54,8 +55,7 @@ app.get('/auth/google/callback', passport.authenticate('google', {
     res.redirect(`http://localhost:5173/auth-success?token=${token}`);
 }
 );
-app.get('/auth/github', passport.authenticate('github', {
-    scope: ['profile', 'email']
+app.get('/api/auth/github', passport.authenticate('github', {
 }));
 
 app.get('/auth/github/callback', passport.authenticate('github', {
