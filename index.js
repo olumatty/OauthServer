@@ -8,6 +8,7 @@ const app = express();
 const PORT = 8000;
 const authRoutes = require('./routes/auth')
 const generateToken = require('./middleware/generateToken')
+const authenticateToken = require('./middleware/auth')
 
 dotenv.config()
 require('./config/googleAuth')
@@ -40,7 +41,7 @@ mongoose.connect(process.env.MONGODB_URI, {
     console.error('MongoDB connection error:', err)
 });
 
-app.use('/api/auth', authRoutes)
+app.use('/api/auth', authenticateToken, authRoutes)
 
 app.get('/api/auth/google', passport.authenticate('google', {
     scope: ['profile', 'email']
@@ -50,11 +51,19 @@ app.get('/auth/google/callback', passport.authenticate('google', {
     failureRedirect: '/login',
     session: false
 }), (req, res) => {
-    // Successful authentication, redirect home.
+    console.log('Backend: Successful Google callback'); // Log that this route is hit
+    console.log('Backend: Authenticated user:', req.user); // Check the user object from Passport
+
     const token = generateToken(req.user);
-    res.redirect(`http://localhost:5173/auth-success?token=${token}`);
+    console.log('Backend: Generated token:', token); // Check the value of the generated token
+
+    const redirectUrl = `http://localhost:5173/auth-success?token=${token}`;
+    console.log('Backend: Redirecting to:', redirectUrl); // Check the full redirect URL
+
+    res.redirect(redirectUrl);
 }
 );
+
 app.get('/api/auth/github', passport.authenticate('github', {
 }));
 

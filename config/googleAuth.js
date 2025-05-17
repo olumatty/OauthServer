@@ -5,7 +5,6 @@ const User = require('../models/user');
 const bcrypt = require('bcrypt');
 const localStrategy = require('passport-local').Strategy;
 const GithubStrategy = require('passport-github2').Strategy;
-const AppleStrategy = require('passport-apple').Strategy;
 
 dotenv.config();
 
