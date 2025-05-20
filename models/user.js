@@ -32,7 +32,6 @@ const userSchema = new mongoose.Schema({
     googleId: { type: String, unique: true, sparse: true },
 
     displayName: { type: String },
-    profilePicture: { type: String },
     createdAt: { type: Date, default: Date.now },
 })
 

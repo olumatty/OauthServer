@@ -10,16 +10,13 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 
-router.post('/register', async (req, res) => {
+router.post('/register', async (req, res) => { 
     try {
         const { username, password, email } = req.body;
 
-        if (!username || !password || !email) {
-            return res.status(400).json({ message: 'All fields are required' });
+        if (!email || !password ) {
+            return res.status(400).json({ message: 'Email and Password fields are required' });
         }
-
-        const existingUser = await User.findOne({ username });
-        if (existingUser) return res.status(400).json({ message: 'Username already exists' });
 
         const existingEmail = await User.findOne({ email });
         if (existingEmail) return res.status(400).json({ message: 'Email already exists' });
@@ -30,6 +27,13 @@ router.post('/register', async (req, res) => {
 
         const token = jwt.sign({ userId: user.userId }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h'});
 
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'none',
+            maxAge: 60 * 60 * 1000
+        });
+
         res.status(201).json({ message: 'User registered successfully', userId: user.userId, token });
     } catch (error) {
         res.status(500).json({ message: 'Error registering user', error: error.message });
@@ -38,15 +42,15 @@ router.post('/register', async (req, res) => {
 
 router.post('/login', async (req, res) => {
     try{
-        const {username, password} = req.body;
+        const {email, password} = req.body;
 
         if(!username || !password){
             return res.status(400).json({message: 'All fields are required'});
         }
 
-        const user = await User.findOne({username});
+        const user = await User.findOne({email});
         if(!user){
-            return res.status(404).json({message: 'User not found'});
+            return res.status(404).json({message: 'User email not found'});
         }
 
         if (user.googleId && !user.password) {
@@ -55,7 +59,7 @@ router.post('/login', async (req, res) => {
 
         const PasswordMatch = await bcrypt.compare(password, user.password);
         if(!PasswordMatch){
-            return res.status(401).json({message: 'Incorrect username or password'});
+            return res.status(401).json({message: 'Incorrect password'});
         }
 
         const token = jwt.sign({ userId: user.userId }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h'});
@@ -89,49 +93,67 @@ router.post('/login', async (req, res) => {
     }
 });
 
-router.get('/logout', (req, res) => {
-    req.logout((err) => {
-        if (err) {
-            return res.status(500).json({ message: 'Internal server error' });
+router.post('/logout', (req, res) => {
+    try{
+        const refreshToken = req.cookies.refreshToken;
+
+        if (refreshToken) {
+
+        console.log (`Attempting to invalidate refreshToken: ${refreshToken}`);
         }
-        res.status(200).json({ message: 'Logout successful' });
-    });
+        res.clearCookie('token', {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'none',
+            path: '/'
+        });
+
+        res.clearCookie('refreshToken', {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'none',
+            path: '/'
+        });
+        res.status(200).json({ message: 'Logged out successfully' });
+    } catch (error) {
+        console.error('Error during logout:', error);
+        res.status(500).json({ message: 'Error logging out', error: error.message });
+    }
 });
 
-router.post('/google', async(req, res) => {
-    const {idToken} = req.body
+router.post('/google', async (req, res) => {
+    const { idToken } = req.body;
 
-    if(!idToken){
-        return res.status(400).json({ message: "Google ID token missing" });
+    if (!idToken) {
+        return res.status(400).json({ message: 'Google ID token missing' });
     }
 
-    try{
+    try {
         const ticket = await client.verifyIdToken({
             idToken,
-            audience: GOOGLE_CLIENT_ID
+            audience: GOOGLE_CLIENT_ID,
         });
         const payload = ticket.getPayload();
         const name = payload.name;
         const email = payload.email;
         const googleId = payload.sub;
-        const picture = payload.picture || '';
         const userId = uuidv4();
 
-        let user = await User.findOne({$or: [{goodleId: googleId}, {email:email}]});
+        let user = await User.findOne({ $or: [{ googleId: googleId }, { email: email }] });
 
-        if(!user){
+        if (!user) {
             user = new User({
                 googleId,
                 email,
                 name,
-                profilePicture: picture,
                 userId,
             });
             await user.save();
             console.log('New user created:', user);
-        } else{
+        } else {
             console.log('User already exists:', user);
         }
+
         const token = jwt.sign({ userId: user.userId }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
         const refreshToken = jwt.sign({ userId: user.userId }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: '7d' });
 
@@ -139,20 +161,57 @@ router.post('/google', async(req, res) => {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'none',
-            maxAge: 60 * 60 * 1000
+            maxAge: 60 * 60 * 1000,
         });
         res.cookie('refreshToken', refreshToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'none',
-            maxAge: 60 * 60 * 1000
+            maxAge: 7 * 24 * 60 * 60 * 1000, // Match refresh token’s 7-day expiration
         });
-    }catch(error){
+
+        res.status(200).json({
+            message: 'Google login successful',
+            token,
+            refreshToken,
+            userId: user.userId,
+            email: user.email,
+            displayName: user.name, // Map 'name' to 'displayName' as expected by frontend
+        });
+    } catch (error) {
         console.error('Error verifying Google ID token:', error);
-        return res.status(500).json({ message: 'Internal server error' });
+        return res.status(500).json({ message: 'Internal server error', error: error.message });
+    }
+});
+
+router.get('/refresh-token', async (req, res) => {
+    const refreshToken = req.cookies.refreshToken ||req.body.refreshToken;
+
+    if (!refreshToken) {
+        return res.status(401).json({ message: 'No refresh token provided' });
     }
 
-    
+    try {
+        const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
+        const user = await User.findById(decoded.userId);
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        const newToken = jwt.sign({ userId: user.userId }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
+
+        res.cookie('token', newToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'none',
+            maxAge: 60 * 60 * 1000
+        });
+        res.status(200).json({ message: 'Token refreshed successfully', token: newToken });
+    } catch (error) {
+        res.status(500).json({ message: 'Error refreshing token', error: error.message });
+        console.error('Error refreshing token:', error);
+    }
 });
 
 
